@@ -35,6 +35,7 @@ import com.dangthanhtu.example05.service.FileService;
 import com.dangthanhtu.example05.service.ProductService;
 
 import jakarta.transaction.Transactional;
+import reactor.core.publisher.Mono;
 
 @Transactional
 @Service
@@ -165,29 +166,43 @@ public ProductDTO addProduct(Long categoryId, Long brandId, Product product) {
     }
 
     @Override
-    public ProductResponse searchProductByKeyword(String keyword, Integer pageNumber, Integer pageSize, String sortBy, String sortOrder) {
-        Sort sortByAndOrder = sortOrder.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
-        Pageable pageDetails = PageRequest.of(pageNumber, pageSize, sortByAndOrder);
-        Page<Product> pageProducts = productRepo.findByProductNameLike(keyword, pageDetails);
-
-        List<Product> products = pageProducts.getContent();
-        if (products.isEmpty()) {
-            throw new APIException("Products not found with keyword: " + keyword);
+    public Mono<ProductResponse> searchProductByKeyword(String keyword, Integer pageNumber, Integer pageSize, String sortBy, String sortOrder) {
+        // Xử lý và validate keyword
+        String trimmedKeyword = keyword.trim();
+        if (trimmedKeyword.isEmpty()) {
+            return Mono.error(new APIException("Please enter a valid keyword"));
         }
-
-        List<ProductDTO> productDTOs = products.stream()
-                .map(product -> modelMapper.map(product, ProductDTO.class))
-                .collect(Collectors.toList());
-
-        ProductResponse productResponse = new ProductResponse();
-        productResponse.setContent(productDTOs);
-        productResponse.setPageNumber(pageProducts.getNumber());
-        productResponse.setPageSize(pageProducts.getSize());
-        productResponse.setTotalElements(pageProducts.getTotalElements());
-        productResponse.setTotalPages(pageProducts.getTotalPages());
-        productResponse.setLastPage(pageProducts.isLast());
-
-        return productResponse;
+    
+        // Tạo Sort và Pageable
+        Sort sort = Sort.by(sortBy);
+        sort = sortOrder.equalsIgnoreCase("asc") ? sort.ascending() : sort.descending();
+        Pageable pageable = PageRequest.of(pageNumber, pageSize, sort);
+    
+        // Gọi repository
+        return Mono.fromCallable(() -> productRepo.searchByProductNameContainingIgnoreCase(trimmedKeyword, pageable))
+                .flatMap(pageProducts -> {
+                    // Xử lý kết quả
+                    List<Product> products = pageProducts.getContent();
+                    if (products.isEmpty()) {
+                        return Mono.error(new APIException("No products found with keyword: " + keyword));
+                    }
+    
+                    // Map sang DTO
+                    List<ProductDTO> productDTOs = products.stream()
+                            .map(product -> modelMapper.map(product, ProductDTO.class))
+                            .collect(Collectors.toList());
+    
+                    // Tạo response
+                    ProductResponse response = new ProductResponse();
+                    response.setContent(productDTOs);
+                    response.setPageNumber(pageProducts.getNumber());
+                    response.setPageSize(pageProducts.getSize());
+                    response.setTotalElements(pageProducts.getTotalElements());
+                    response.setTotalPages(pageProducts.getTotalPages());
+                    response.setLastPage(pageProducts.isLast());
+    
+                    return Mono.just(response);
+                });
     }
 
     @Override

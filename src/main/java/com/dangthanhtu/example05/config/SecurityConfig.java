@@ -42,6 +42,7 @@ public class SecurityConfig{
                     .cors(cors ->cors.configurationSource(corsConfigurationSource()))
                     .authorizeHttpRequests(requests -> requests
                             .requestMatchers(AppConstants.PUBLIC_URLS).permitAll()
+                            .requestMatchers("/api/chat").permitAll()
                             .requestMatchers(AppConstants.USER_URLS).hasAnyAuthority("USER","ADMIN")
                             .requestMatchers(AppConstants.ADMIN_URLS).hasAuthority("ADMIN")
                             .anyRequest().authenticated())

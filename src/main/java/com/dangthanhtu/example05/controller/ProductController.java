@@ -30,6 +30,7 @@ import com.dangthanhtu.example05.service.ProductService;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/api")
@@ -86,21 +87,20 @@ public ResponseEntity<ProductDTO> addProduct(@Valid @RequestBody Product product
     }
 
     @GetMapping("/public/products/keyword/{keyword}")
-    public ResponseEntity<ProductResponse> getProductsByKeyword(
+    public Mono<ResponseEntity<ProductResponse>> getProductsByKeyword(
             @PathVariable String keyword,
             @RequestParam(name = "pageNumber", defaultValue = AppConstants.PAGE_NUMBER, required = false) Integer pageNumber,
             @RequestParam(name = "pageSize", defaultValue = AppConstants.PAGE_SIZE, required = false) Integer pageSize,
             @RequestParam(name = "sortBy", defaultValue = AppConstants.SORT_PRODUCTS_BY, required = false) String sortBy,
             @RequestParam(name = "sortOrder", defaultValue = AppConstants.SORT_DIR, required = false) String sortOrder) {
     
-        ProductResponse productResponse = productService.searchProductByKeyword(
+        return productService.searchProductByKeyword(
                 keyword,
                 pageNumber == 0 ? pageNumber : pageNumber - 1,
                 pageSize,
                 "id".equals(sortBy) ? "productId" : sortBy,
-                sortOrder);
-    
-        return new ResponseEntity<>(productResponse, HttpStatus.OK);
+                sortOrder)
+            .map(productResponse -> ResponseEntity.ok(productResponse));
     }
     
 
